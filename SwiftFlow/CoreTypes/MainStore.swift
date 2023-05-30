@@ -8,12 +8,13 @@
 
 import Foundation
 
-public class MainStore: Store {
+open class MainStore: Store {
 
     // TODO: Setter should not be public; need way for store enhancers to modify appState anyway
     /*private (set)*/ public var appState: StateType {
         didSet {
-            subscribers.forEach { $0._newState(appState) }
+            print("BK: new state: \(appState)")
+            subscribers.forEach { $0._newState(state: appState) }
         }
     }
 
@@ -27,54 +28,60 @@ public class MainStore: Store {
 
     public func subscribe(subscriber: AnyStoreSubscriber) {
         subscribers.append(subscriber)
-        subscriber._newState(appState)
+        subscriber._newState(state: appState)
     }
 
     public func unsubscribe(subscriber: AnyStoreSubscriber) {
-        let index = subscribers.indexOf { return $0 === subscriber }
-
-        if let index = index {
-            subscribers.removeAtIndex(index)
+        guard let index = subscribers.firstIndex(where: { $0 === subscriber }) else {
+            return
         }
-    }
+        
+        print("BK: subscriber removed: \(index)")
+        subscribers.remove(at: index)
+     }
 
     public func dispatch(action: ActionConvertible) {
-        dispatch(action.toAction())
+        dispatch(action: action.toAction())
     }
 
     public func dispatch(action: ActionType) {
-        dispatch(action.toAction(), callback: nil)
+        dispatch(action: action.toAction(), callback: nil)
     }
 
     public func dispatch(actionCreatorProvider: ActionCreator) {
-        dispatch(actionCreatorProvider, callback: nil)
+        dispatch(actionCreatorProvider: actionCreatorProvider, callback: nil)
     }
 
     public func dispatch(asyncActionCreatorProvider: AsyncActionCreator) {
-        dispatch(asyncActionCreatorProvider, callback: nil)
+        dispatch(asyncActionCreatorProvider: asyncActionCreatorProvider, callback: nil)
     }
 
     public func dispatch(action: ActionType, callback: DispatchCallback?) {
         // Dispatch Asynchronously so that each subscriber receives the latest state
         // Without Async a receiver could immediately be called and emit a new state
-        dispatch_async(dispatch_get_main_queue()) {
-            self.appState = self.reducer._handleAction(self.appState, action: action.toAction())
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            
+            self.appState = self.reducer._handleAction(state: self.appState, action: action.toAction())
             callback?(self.appState)
         }
     }
 
     public func dispatch(actionCreatorProvider: ActionCreator, callback: DispatchCallback?) {
-        let action = actionCreatorProvider(state: self.appState, store: self)
+        let action = actionCreatorProvider(self.appState, self)
         if let action = action {
-            dispatch(action, callback: callback)
+            dispatch(action: action, callback: callback)
         }
     }
 
-    public func dispatch(actionCreatorProvider: AsyncActionCreator, callback: DispatchCallback?) {
-        actionCreatorProvider(state: self.appState, store: self) { actionProvider in
-            let action = actionProvider(state: self.appState, store: self)
-            if let action = action {
-                self.dispatch(action, callback: callback)
+    public func dispatch(
+        asyncActionCreatorProvider actionCreatorProvider: AsyncActionCreator,
+        callback: DispatchCallback?
+    ) {
+        actionCreatorProvider(self.appState, self) { actionProvider in
+            let action = actionProvider(self.appState, self)
+            if let action {
+                self.dispatch(action: action, callback: callback)
             }
         }
     }

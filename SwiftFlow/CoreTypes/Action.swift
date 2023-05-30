@@ -41,10 +41,10 @@ extension Action: Coding {
     }
 
     public func dictionaryRepresentation() -> [String : AnyObject] {
-        if let payload = payload {
-            return ["type": type, "payload": payload]
+        if let payload {
+            return ["type": type as AnyObject, "payload": payload as AnyObject]
         } else {
-            return ["type": type, "payload": "null"]
+            return ["type": type as AnyObject, "payload": "null" as AnyObject]
         }
     }
     

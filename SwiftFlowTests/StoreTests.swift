@@ -31,17 +31,20 @@ struct SetValueAction: ActionConvertible {
     }
 
     func toAction() -> Action {
-        return Action(type: SetValueAction.type, payload: ["value": value])
+        return Action(type: SetValueAction.type, payload: ["value": value as AnyObject])
     }
 
 }
 
 struct TestReducer: Reducer {
-    func handleAction(var state: TestAppState, action: Action) -> TestAppState {
+    typealias ReducerStateType = TestAppState
+    
+    func handleAction(state: TestAppState, action: Action) -> TestAppState {
         switch action.type {
         case SetValueAction.type:
-            state.testValue = SetValueAction(action).value
-            return state
+            var newState = state
+            newState.testValue = SetValueAction(action).value
+            return newState
         default:
             abort()
         }
@@ -69,52 +72,57 @@ class StoreTests: XCTestCase {
     }
 
     func testDispatchesInitialValueUponSubscription() {
-        let expectation = expectationWithDescription("Sends initial value")
+        let expectation = expectation(description: "Sends initial value")
         store = MainStore(reducer: reducer, appState: TestAppState())
         let subscriber = TestStoreSubscriber()
-
-        store.dispatch(SetValueAction(3)) { newState in
+        
+        store.dispatch(action: SetValueAction(3)) { newState in
             if (subscriber.receivedStates.last?.testValue == 3) {
                 expectation.fulfill()
+            } else {
+                print("BK: No!!")
             }
+                
         }
-
-        store.subscribe(subscriber)
-
-        waitForExpectationsWithTimeout(2.0, handler: nil)
+        
+        store.subscribe(subscriber: subscriber)
+        
+        waitForExpectations(timeout: 2.0, handler: nil)
     }
 
     func testDoesNotDispatchValuesWhenUnsubscribed() {
-        let expectation = expectationWithDescription("Sends subsequent values")
+        let expectation = expectation(description: "Sends subsequent values")
         store = MainStore(reducer: reducer, appState: TestAppState())
         let subscriber = TestStoreSubscriber()
 
-        store.dispatch(SetValueAction(5))
-        store.subscribe(subscriber)
-        store.dispatch(SetValueAction(10))
+        store.dispatch(action: SetValueAction(5))
+        store.subscribe(subscriber: subscriber)
+        store.dispatch(action: SetValueAction(10))
 
         // Let Run Loop Run so that dispatched actions can be performed
-        NSRunLoop.currentRunLoop().runMode(NSDefaultRunLoopMode, beforeDate: NSDate.distantFuture())
+        RunLoop.current.run(mode: .default, before: .distantFuture)
 
-        store.unsubscribe(subscriber)
+        store.unsubscribe(subscriber: subscriber)
         // Following value is missed due to not being subscribed:
-        store.dispatch(SetValueAction(15))
-        store.dispatch(SetValueAction(25))
+        store.dispatch(action: SetValueAction(15))
+        store.dispatch(action: SetValueAction(25))
 
         // Let Run Loop Run so that dispatched actions can be performed
-        NSRunLoop.currentRunLoop().runMode(NSDefaultRunLoopMode, beforeDate: NSDate.distantFuture())
+        RunLoop.current.run(mode: .default, before: .distantFuture)
 
-        store.subscribe(subscriber)
+        store.subscribe(subscriber: subscriber)
 
-        store.dispatch(SetValueAction(20)) { newState in
-            if (subscriber.receivedStates[subscriber.receivedStates.count - 1].testValue == 20
-                && subscriber.receivedStates[subscriber.receivedStates.count - 2].testValue == 25
-                 && subscriber.receivedStates[subscriber.receivedStates.count - 3].testValue == 10) {
+        store.dispatch(action: SetValueAction(20)) { newState in
+            print("BK states: \(subscriber.receivedStates)")
+            if subscriber.receivedStates[subscriber.receivedStates.count - 1].testValue == 20,
+               subscriber.receivedStates[subscriber.receivedStates.count - 2].testValue == 25,
+               subscriber.receivedStates[subscriber.receivedStates.count - 3].testValue == 10,
+               subscriber.receivedStates[subscriber.receivedStates.count - 4].testValue == 5{
                     expectation.fulfill()
             }
         }
 
-        waitForExpectationsWithTimeout(2.0, handler: nil)
+        waitForExpectations(timeout: 2.0, handler: nil)
     }
 
 }

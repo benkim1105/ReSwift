@@ -13,15 +13,13 @@ public protocol AnyReducer {
 }
 
 public protocol Reducer: AnyReducer {
-    typealias ReducerStateType
+    associatedtype ReducerStateType
 
     func handleAction(state: ReducerStateType, action: Action) -> ReducerStateType
 }
 
 extension Reducer {
-
     public func _handleAction(state: StateType, action: Action) -> StateType {
-        return withSpecificTypes(state, action: action, function: handleAction)
+        return withSpecificTypes(state: state, action: action, function: handleAction)
     }
-    
 }
